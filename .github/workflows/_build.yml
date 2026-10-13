@@ -119,6 +119,9 @@ jobs:
           TORCH_VERSION: ${{ inputs.torch-version }}
           HIP_ARCHITECTURES: gfx90a,gfx942,gfx950,gfx1100,gfx1200,gfx1201
         run: |
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            export PATH="$(cygpath -u "$VCToolsInstallDir")/bin/Hostx64/x64:$PATH"
+          fi
           python - <<'PY'
           import os
           import subprocess
