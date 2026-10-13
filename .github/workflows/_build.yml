@@ -28,6 +28,8 @@ on:
         type: string
 jobs:
   build-wheel:
+    env:
+      MAX_JOBS: "2"
     permissions:
       contents: read
     # CUDA 12 needs the Visual Studio 2022 runner image.

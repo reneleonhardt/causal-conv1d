@@ -1,5 +1,8 @@
 name: Packaging
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore: [chore/update-dependencies-ci]
+  pull_request:
 permissions:
   contents: read
 jobs:
