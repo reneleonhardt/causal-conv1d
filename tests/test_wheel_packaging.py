@@ -263,6 +263,67 @@ def test_host_compiler_flags(target):
     )
 
 
+@pytest.mark.parametrize("target", ["linux", "win32"])
+def test_hip_compiler_version(target, monkeypatch):
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "setup.py").read_text())
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "get_hip_version"
+    )
+    calls = []
+    monkeypatch.setattr(
+        subprocess,
+        "check_output",
+        lambda args, **_: calls.append(args) or "HIP version: 7.2.53211-abcdef\n",
+    )
+    namespace = {
+        "sys": SimpleNamespace(platform=target),
+        "os": __import__("os"),
+        "subprocess": subprocess,
+        "parse": parse,
+    }
+    exec(  # noqa: S102 - controlled setup node
+        compile(ast.Module([function], type_ignores=[]), "setup.py", "exec"), namespace
+    )
+    assert namespace["get_hip_version"]("sdk")[1] == parse("7.2.53211+abcdef")
+    assert calls[0] == [
+        str(Path("sdk/bin") / ("hipcc.exe" if target == "win32" else "hipcc")),
+        "--version",
+    ]
+
+
+@pytest.mark.parametrize("hip,backend", [(None, "cu13"), ("7.2.53211-abcdef", "hip72")])
+def test_workflow_wheel_backend(tmp_path, monkeypatch, hip, backend):
+    import os
+
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github/workflows/_build.yml"
+    ).read_text()
+    script = textwrap.dedent(
+        re.search(r"python - <<'PY'\n(.*?)\n\s+PY", workflow, re.DOTALL)[1]
+    )
+    torch = SimpleNamespace(
+        version=SimpleNamespace(hip=hip, cuda="13.2"),
+        _C=SimpleNamespace(_GLIBCXX_USE_CXX11_ABI=True),
+    )
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setenv("TORCH_VERSION", "2.14.0+rocm10.1.0" if hip else "2.14.1")
+    monkeypatch.setenv("CAUSAL_CONV1D_LOCAL_VERSION", "")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "dist").mkdir()
+    (tmp_path / "dist/causal_conv1d-1.0.0-cp314-cp314-linux_x86_64.whl").touch()
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **_: calls.append(args))
+    exec(compile(script, "wheel-build", "exec"), {})  # noqa: S102 - controlled workflow script
+    suffix = f"{backend}torch2.14cxx11abiTRUE"
+    assert os.environ["CAUSAL_CONV1D_LOCAL_VERSION"] == suffix
+    assert (
+        tmp_path / f"dist/causal_conv1d-1.0.0+{suffix}-cp314-cp314-linux_x86_64.whl"
+    ).exists()
+    assert calls[0][1:3] == ["-m", "build"]
+
+
 @pytest.mark.parametrize("failures", [1, 2])
 def test_cuda_index_retry_preserves_failure(tmp_path, failures):
     import os

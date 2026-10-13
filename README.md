@@ -31,6 +31,16 @@ F.conv1d(x, weight.unsqueeze(1), bias, padding=width - 1, groups=dim)[..., :seql
 
 ## Additional Prerequisites for AMD cards
 
+For TheRock source builds, install the matching PyTorch runtime and development SDK from AMD's stable index:
+
+```bash
+uv pip install --group build --no-sources --index https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]"
+rocm-sdk init
+```
+
+Set `ROCM_PATH` to the output of `rocm-sdk path --root`; on Windows also set `CXX=amdclang-cl`.
+When building without a GPU, set `HIP_ARCHITECTURES` to the target GPU architecture, such as `gfx942`.
+
 ### Patching ROCm
 
 If you are on ROCm 6.0, run the following steps to avoid errors during compilation. This is not required for ROCm 6.1 onwards.

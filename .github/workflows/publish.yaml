@@ -71,6 +71,28 @@ jobs:
       release-version: ${{ needs.setup_release.outputs.release-version }}
       upload-to-release: true
 
+  build_rocm_wheels:
+    permissions:
+      id-token: write
+      attestations: write
+      contents: write
+    needs: setup_release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    uses: $/.github/workflows/_build.yml
+    with:
+      runs-on: ${{ matrix.os }}
+      python-version: ${{ matrix.python-version }}
+      cuda-version: ""
+      rocm-version: "10.1.0"
+      torch-version: "2.14.0+rocm10.1.0"
+      cxx11_abi: "TRUE"
+      release-version: ${{ needs.setup_release.outputs.release-version }}
+      upload-to-release: true
+
   check_for_ngc_images:
     if: github.repository == 'Dao-AILab/causal-conv1d'
     runs-on: ubuntu-latest
@@ -114,11 +136,11 @@ jobs:
       id-token: write
       attestations: write
     name: Publish package
-    needs: [build_wheels, build_ngc_wheels]
+    needs: [build_wheels, build_rocm_wheels, build_ngc_wheels]
 
     runs-on: ubuntu-latest
     if: always() && !cancelled() && github.repository == 'Dao-AILab/causal-conv1d' &&
-      needs.build_wheels.result == 'success' && (needs.build_ngc_wheels.result == 'success' || needs.build_ngc_wheels.result == 'skipped')
+      needs.build_wheels.result == 'success' && needs.build_rocm_wheels.result == 'success' && (needs.build_ngc_wheels.result == 'success' || needs.build_ngc_wheels.result == 'skipped')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

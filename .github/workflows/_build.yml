@@ -1,4 +1,4 @@
-name: Build CUDA wheel
+name: Build GPU wheel
 on:
   workflow_call:
     inputs:
@@ -10,6 +10,8 @@ on:
         type: string
       cuda-version:
         required: true
+        type: string
+      rocm-version:
         type: string
       torch-version:
         required: true
@@ -51,7 +53,7 @@ jobs:
           vsversion: ${{ startsWith(inputs.cuda-version, '12.') && '2022' || '' }}
       # The CUDA action's Windows download table predates CUDA 13.4.
       - name: Install CUDA on Windows
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && inputs.rocm-version == ''
         shell: pwsh
         env:
           CUDA_VERSION: ${{ inputs.cuda-version }}
@@ -72,7 +74,7 @@ jobs:
           "$cudaPath\bin" >> $env:GITHUB_PATH
           Remove-Item $installer
       - name: Install CUDA on Linux
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && inputs.rocm-version == ''
         env:
           CUDA_VERSION: ${{ inputs.cuda-version }}
         run: |
@@ -88,17 +90,30 @@ jobs:
           echo "CUDA_HOME=/usr/local/cuda-$minor" >> "$GITHUB_ENV"
           echo "/usr/local/cuda-$minor/bin" >> "$GITHUB_PATH"
       - name: Install build dependencies and matching PyTorch wheel
+        if: inputs.rocm-version == ''
         env:
           TORCH_VERSION: ${{ inputs.torch-version }}
           TORCH_BACKEND: ${{ inputs.torch-index }}
         run: |
           uv pip install --group build --upgrade --no-sources --torch-backend "$TORCH_BACKEND" "torch==$TORCH_VERSION"
           nvcc --version
+      - name: Install stable TheRock SDK and matching PyTorch wheel
+        if: inputs.rocm-version != ''
+        env:
+          ROCM_VERSION: ${{ inputs.rocm-version }}
+          TORCH_VERSION: ${{ inputs.torch-version }}
+        run: |
+          uv pip install --group build --upgrade --no-sources --index https://stable.repo.amd.com/rocm/whl-next/ "torch==$TORCH_VERSION" "rocm[devel]==$ROCM_VERSION"
+          rocm-sdk init
+          echo "ROCM_PATH=$(rocm-sdk path --root)" >> "$GITHUB_ENV"
+          if [[ "$RUNNER_OS" == Windows ]]; then echo "CXX=amdclang-cl" >> "$GITHUB_ENV"; fi
+          hipcc --version
       - name: Build wheel
         env:
           CAUSAL_CONV1D_FORCE_BUILD: "TRUE"
           CAUSAL_CONV1D_FORCE_CXX11_ABI: ${{ inputs.cxx11_abi }}
           TORCH_VERSION: ${{ inputs.torch-version }}
+          HIP_ARCHITECTURES: gfx90a,gfx942,gfx950,gfx1100,gfx1200,gfx1201
         run: |
           python - <<'PY'
           import os
@@ -106,7 +121,13 @@ jobs:
           import sys
           from pathlib import Path
           import torch
-          suffix = f"cu{torch.version.cuda.split('.')[0]}torch{'.'.join(os.environ['TORCH_VERSION'].split('.')[:2])}cxx11abi{str(torch._C._GLIBCXX_USE_CXX11_ABI).upper()}"
+          from packaging.version import parse
+          if torch.version.hip:
+              hip = parse(torch.version.hip.split()[-1].replace('-', '+'))
+              backend = f"hip{hip.major}{hip.minor}"
+          else:
+              backend = f"cu{torch.version.cuda.split('.')[0]}"
+          suffix = f"{backend}torch{'.'.join(os.environ['TORCH_VERSION'].split('.')[:2])}cxx11abi{str(torch._C._GLIBCXX_USE_CXX11_ABI).upper()}"
           os.environ["CAUSAL_CONV1D_LOCAL_VERSION"] = suffix
           subprocess.run([sys.executable, "-m", "build", "--wheel", "--no-isolation", "--outdir", "dist"], check=True)
           for wheel in Path('dist').glob('*.whl'):

@@ -77,7 +77,8 @@ def get_cuda_bare_metal_version(cuda_dir):
 
 
 def get_hip_version(rocm_dir):
-    hipcc_bin = "hipcc" if rocm_dir is None else os.path.join(rocm_dir, "bin", "hipcc")
+    hipcc_name = "hipcc.exe" if sys.platform == "win32" else "hipcc"
+    hipcc_bin = hipcc_name if rocm_dir is None else os.path.join(rocm_dir, "bin", hipcc_name)
     try:
         raw_output = subprocess.check_output(
             [hipcc_bin, "--version"], universal_newlines=True
@@ -153,6 +154,8 @@ if not SKIP_CUDA_BUILD:
         _, hip_version = get_hip_version(rocm_home)
 
         if HIP_HOME is not None:
+            if hip_version is None:
+                raise RuntimeError("Could not determine the HIP compiler version.")
             if hip_version < Version("6.0"):
                 raise RuntimeError(
                     f"{PACKAGE_NAME} is only supported on ROCm 6.0 and above.  "

@@ -1,4 +1,4 @@
-name: Stable CUDA wheel matrix
+name: Stable GPU wheel matrix
 on:
   workflow_dispatch:
 permissions:
@@ -34,3 +34,17 @@ jobs:
       torch-index: ${{ matrix.torch-index }}
       cxx11_abi: ${{ matrix.cxx11_abi }}
       upload-to-release: false
+  rocm:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    uses: $/.github/workflows/_build.yml
+    with:
+      runs-on: ${{ matrix.os }}
+      python-version: ${{ matrix.python-version }}
+      cuda-version: ""
+      rocm-version: "10.1.0"
+      torch-version: "2.14.0+rocm10.1.0"
+      cxx11_abi: "TRUE"
