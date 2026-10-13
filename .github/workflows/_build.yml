@@ -104,8 +104,12 @@ jobs:
         run: |
           uv pip install --group build --upgrade --no-sources --index https://stable.repo.amd.com/rocm/whl-next/ "torch==$TORCH_VERSION" "rocm[devel]==$ROCM_VERSION"
           rocm-sdk init
-          echo "ROCM_PATH=$(rocm-sdk path --root)" >> "$GITHUB_ENV"
-          if [[ "$RUNNER_OS" == Windows ]]; then echo "CXX=amdclang-cl" >> "$GITHUB_ENV"; fi
+          rocm_root=$(rocm-sdk path --root)
+          echo "ROCM_PATH=$rocm_root" >> "$GITHUB_ENV"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            echo "CXX=amdclang-cl" >> "$GITHUB_ENV"
+            echo "HIP_DEVICE_LIB_PATH=$rocm_root/lib/llvm/amdgcn/bitcode" >> "$GITHUB_ENV"
+          fi
           hipcc --version
       - name: Build wheel
         env:

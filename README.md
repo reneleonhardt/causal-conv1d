@@ -38,7 +38,8 @@ uv pip install --group build --no-sources --index https://stable.repo.amd.com/ro
 rocm-sdk init
 ```
 
-Set `ROCM_PATH` to the output of `rocm-sdk path --root`; on Windows also set `CXX=amdclang-cl`.
+Set `ROCM_PATH` to the output of `rocm-sdk path --root`.
+On Windows also set `CXX=amdclang-cl` and `HIP_DEVICE_LIB_PATH=%ROCM_PATH%\lib\llvm\amdgcn\bitcode`.
 When building without a GPU, set `HIP_ARCHITECTURES` to the target GPU architecture, such as `gfx942`.
 
 ### Patching ROCm
