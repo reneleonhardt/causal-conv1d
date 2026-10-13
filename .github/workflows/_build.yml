@@ -70,7 +70,6 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "CUDA installer failed: $($process.ExitCode)" }
           $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v$minor"
           "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
-          "DISTUTILS_USE_SDK=1" >> $env:GITHUB_ENV
           "$cudaPath\bin" >> $env:GITHUB_PATH
           Remove-Item $installer
       - name: Install CUDA on Linux
@@ -110,6 +109,7 @@ jobs:
           hipcc --version
       - name: Build wheel
         env:
+          DISTUTILS_USE_SDK: "1"
           CAUSAL_CONV1D_FORCE_BUILD: "TRUE"
           CAUSAL_CONV1D_FORCE_CXX11_ABI: ${{ inputs.cxx11_abi }}
           TORCH_VERSION: ${{ inputs.torch-version }}

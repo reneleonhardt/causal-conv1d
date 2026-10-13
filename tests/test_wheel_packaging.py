@@ -275,7 +275,7 @@ def test_hip_compiler_version(target, monkeypatch):
     monkeypatch.setattr(
         subprocess,
         "check_output",
-        lambda args, **_: calls.append(args) or "HIP version: 7.2.53211-abcdef\n",
+        lambda args, **_: calls.append(args) or "HIP version: 7.16.26385-7da43026e4\n",
     )
     namespace = {
         "sys": SimpleNamespace(platform=target),
@@ -286,14 +286,16 @@ def test_hip_compiler_version(target, monkeypatch):
     exec(  # noqa: S102 - controlled setup node
         compile(ast.Module([function], type_ignores=[]), "setup.py", "exec"), namespace
     )
-    assert namespace["get_hip_version"]("sdk")[1] == parse("7.2.53211+abcdef")
+    assert namespace["get_hip_version"]("sdk")[1] == parse("7.16.26385+7da43026e4")
     assert calls[0] == [
         str(Path("sdk/bin") / ("hipcc.exe" if target == "win32" else "hipcc")),
         "--version",
     ]
 
 
-@pytest.mark.parametrize("hip,backend", [(None, "cu13"), ("7.2.53211-abcdef", "hip72")])
+@pytest.mark.parametrize(
+    "hip,backend", [(None, "cu13"), ("7.16.26385-7da43026e4", "hip716")]
+)
 def test_workflow_wheel_backend(tmp_path, monkeypatch, hip, backend):
     import os
 
